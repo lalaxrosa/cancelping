@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>예약 취소표 알리미 MVP</title>
+  <!-- Google Fonts (Outfit & Inter) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- 앱 컨테이너 -->
+  <div class="app-container">
+    
+    <!-- 1. 알림 권한 유도 배너 -->
+    <div id="notification-banner" class="banner hidden">
+      <div class="banner-content">
+        <span class="banner-icon">🔔</span>
+        <span class="banner-text">실시간 취소표 알림을 받으려면 브라우저 알림 권한을 승인해야 합니다.</span>
+      </div>
+      <button id="btn-grant-permission" class="btn btn-primary btn-sm">알림 권한 허용</button>
+    </div>
+
+    <!-- 2. 헤더 영역 -->
+    <header class="app-header">
+      <div class="logo-area">
+        <h1>예약 취소표 알리미</h1>
+        <span class="badge badge-mvp">MVP</span>
+      </div>
+      
+      <div class="header-controls">
+        <!-- 모드 토글 (시뮬레이션 / 실제) -->
+        <div class="toggle-control" title="CORS 제약으로 인해 로컬 파일 실행 시에는 시뮬레이션 모드를 권장합니다.">
+          <span class="toggle-label">시뮬레이션 모드</span>
+          <label class="switch">
+            <input type="checkbox" id="mode-toggle" checked>
+            <span class="slider round"></span>
+          </label>
+        </div>
+
+        <!-- 다크모드 토글 -->
+        <button id="theme-toggle" class="btn-theme-toggle" aria-label="테마 전환">
+          <span class="theme-icon light-icon">☀️</span>
+          <span class="theme-icon dark-icon">🌙</span>
+        </button>
+
+        <!-- 새 감시 추가 버튼 -->
+        <button id="btn-open-modal" class="btn btn-primary">
+          <span class="btn-icon">+</span> 새 감시 추가
+        </button>
+      </div>
+    </header>
+
+    <!-- 3. 시뮬레이션 모드 안내 배너 -->
+    <div id="simulation-info-card" class="info-card">
+      <div class="info-icon">💡</div>
+      <div class="info-body">
+        <h3>시뮬레이션 모드가 켜져 있습니다.</h3>
+        <p>로컬 웹 브라우저(`file://`) 환경의 CORS 보안 정책을 피하기 위해 가상으로 상태 변화 및 알림을 발생시킵니다. 카드의 스위치가 켜지면 지정된 주기마다 감시가 수행되며, 데모용으로 수십 초 이내에 상태 변화(예약 가능 🟢 / 예약 불가 🔴)와 브라우저 알림이 트리거됩니다.</p>
+      </div>
+    </div>
+
+    <!-- 4. 감시 대상 리스트 그리드 -->
+    <main class="main-content">
+      <div class="section-header">
+        <h2>감시 중인 예약 목록 (<span id="monitor-count">0</span>)</h2>
+        <button id="btn-load-presets" class="btn btn-outline btn-sm">추천 프리셋 로드</button>
+      </div>
+
+      <!-- 리스트 비어있을 때 표시할 플레이스홀더 -->
+      <div id="empty-state" class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <h3>등록된 감시 대상이 없습니다.</h3>
+        <p>새로운 예약 페이지를 추가하여 취소표 감시를 시작해 보세요!</p>
+        <button id="btn-empty-add" class="btn btn-primary">새 감시 추가하기</button>
+      </div>
+
+      <!-- 실시간 카드 그리드 -->
+      <div id="monitor-grid" class="monitor-grid hidden">
+        <!-- 카드가 js/ui.js 에 의해 동적으로 추가됩니다 -->
+      </div>
+    </main>
+
+    <!-- 5. 푸터 영역 -->
+    <footer class="app-footer">
+      <p>© 2026 예약 취소표 알리미 MVP. All rights reserved.</p>
+      <p class="footer-note">본 서비스는 개인적 용도의 알림 목적을 가지며, 예약 자동화 및 비정상 트래픽 발생 기능을 제공하지 않습니다.</p>
+    </footer>
+
+  </div>
+
+  <!-- 6. 등록 및 수정 모달 다이얼로그 -->
+  <div id="modal-container" class="modal-container hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-title">새 감시 추가</h2>
+        <button id="btn-close-modal-x" class="btn-close-x">&times;</button>
+      </div>
+      
+      <form id="monitor-form">
+        <input type="hidden" id="monitor-id">
+        
+        <div class="form-group">
+          <label for="monitor-name">서비스 이름 <span class="required">*</span></label>
+          <input type="text" id="monitor-name" placeholder="예: 국립자연휴양림 (유명산)" required autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label for="monitor-url">예약 페이지 URL <span class="required">*</span></label>
+          <input type="url" id="monitor-url" placeholder="예: https://www.foresttrip.go.kr/index.do" required autocomplete="off">
+          <small class="form-help">실제 Fetch 모드에서는 이 주소의 HTML 내용을 긁어옵니다.</small>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="monitor-keywords-avail">예약 가능 키워드 / 이미지 파일명 <span class="required">*</span></label>
+            <input type="text" id="monitor-keywords-avail" value="예약하기, 예약 가능, 선택 가능, 잔여석, btn_reserve.gif" required autocomplete="off">
+            <small class="form-help">쉼표(,) 구분. 텍스트 또는 이미지 파일명(예: btn_reserve.gif, reserve_on.png)을 감지합니다.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="monitor-keywords-unavail">예약 불가 키워드 / 이미지 파일명 <span class="required">*</span></label>
+            <input type="text" id="monitor-keywords-unavail" value="매진, 예약 마감, 잔여석 없음, btn_soldout.gif" required autocomplete="off">
+            <small class="form-help">쉼표(,) 구분. 텍스트 또는 이미지 파일명(예: btn_soldout.gif, reserve_off.png)을 감지합니다.</small>
+          </div>
+        </div>
+
+        <!-- 이미지 클립보드 붙여넣기 기능 추가 -->
+        <div class="form-group">
+          <label>이미지 감시 등록 (선택사항) <span class="badge badge-mvp" style="font-size: 10px; padding: 2px 6px;">NEW</span></label>
+          <div id="image-paste-zone" class="image-paste-zone" tabindex="0">
+            <div class="paste-placeholder">
+              <span class="paste-icon">📋</span>
+              <p>클립보드 이미지를 여기에 붙여넣으세요 (Ctrl + V)</p>
+              <small>예약 가능/불가 상태를 나타내는 화면 조각을 캡처한 뒤 붙여넣기</small>
+            </div>
+            <div id="paste-preview-container" class="paste-preview-container hidden">
+              <img id="paste-preview" src="" alt="붙여넣은 이미지">
+              <button type="button" id="btn-clear-paste" class="btn-clear-image" title="이미지 삭제">&times;</button>
+            </div>
+          </div>
+          <input type="hidden" id="monitor-pasted-image">
+          
+          <div id="image-type-selection" class="form-row hidden" style="margin-top: 10px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label>붙여넣은 이미지 매칭 시 상태 판정</label>
+              <div class="radio-group">
+                <label class="radio-label">
+                  <input type="radio" name="pasted-image-type" id="pasted-image-avail" value="available" checked>
+                  <span style="margin-left: 4px;">예약 가능으로 감지 🟢</span>
+                </label>
+                <label class="radio-label" style="margin-left: 20px;">
+                  <input type="radio" name="pasted-image-type" id="pasted-image-unavail" value="unavailable">
+                  <span style="margin-left: 4px;">예약 불가로 감지 🔴</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="monitor-interval">확인 주기 <span class="required">*</span></label>
+          <select id="monitor-interval" required>
+            <option value="30000">30초</option>
+            <option value="60000" selected>1분</option>
+            <option value="300000">5분</option>
+            <option value="600000">10분</option>
+          </select>
+        </div>
+
+        <!-- CORS 프록시 서버 사용 옵션 추가 -->
+        <div class="form-group" style="margin-top: 10px;">
+          <label class="switch-container" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="monitor-use-proxy" style="width: auto; min-height: auto; cursor: pointer;" checked>
+            <span style="font-size: 0.85rem; font-weight: 600; color: var(--text);">CORS 프록시 서버 경유 (우회 검사)</span>
+          </label>
+          <small class="form-help">확장프로그램 설정 없이도 대부분의 CORS 차단을 서버 단에서 우회해 줍니다. (단, 대상 사이트가 클라우드플레어 등 강력한 보안 솔루션을 쓸 경우 차단될 수 있습니다.)</small>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="btn-cancel-modal" class="btn btn-outline">취소</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-monitor">감시조건 추가</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- JavaScript 모듈 로드 (로컬 더블클릭 실행을 위해 ES6 modules 대신 일반 스크립트 전역 공유 방식 활용) -->
+  <script src="js/storage.js"></script>
+  <script src="js/notification.js"></script>
+  <script src="js/monitor.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

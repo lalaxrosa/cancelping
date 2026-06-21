@@ -1,0 +1,2 @@
+This folder is reserved for project assets (icons, images, audio, etc.).
+Currently, the application uses CSS gradients, Google Fonts, and the Web Audio API for a lightweight, zero-dependency experience.
